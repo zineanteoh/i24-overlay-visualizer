@@ -2,11 +2,10 @@ import torch.multiprocessing as mp
 import socket
 import _pickle as pickle
 
-from i24_logger.log_writer         import logger,catch_critical,log_warnings
+from i24_logger.log_writer         import logger, catch_critical, log_warnings
 
 
 ctx = mp.get_context('spawn')
-
 
 import numpy as np
 import torch
@@ -14,17 +13,11 @@ import os
 import time
 import pymongo
 
-from src.util.bbox                 import space_nms
 from src.util.misc                 import plot_scene,colors,Timer
 from i24_configparse               import parse_cfg
-from src.track.tracker             import get_Tracker, get_Associator
-from src.track.trackstate          import TrackState
-from src.detect.pipeline           import get_Pipeline
 from src.scene.devicemap           import get_DeviceMap
-from src.scene.homography          import HomographyWrapper,Homography
-from src.detect.devicebank         import DeviceBank
+from src.scene.homography          import HomographyWrapper, Homography
 from src.load.gpu_load_multi       import MCLoader, ManagerClock
-from src.db_write                  import WriteWrapper
 
 @log_warnings()
 def parse_cfg_wrapper(run_config):
@@ -86,24 +79,6 @@ def main():
     
     # initialize Homography object
     hg = HomographyWrapper(hg1 = params.eb_homography_file,hg2 = params.wb_homography_file)
-    
-    if params.track:
-        print("TRACKING")
-        # initialize pipelines
-        # pipelines = params.pipelines
-        # pipelines = [get_Pipeline(item, hg) for item in pipelines]
-        
-        # associators = params.associators
-        # associators = [get_Associator(item) for item in associators]
-        
-        # # initialize DetectorBank
-        # dbank = DeviceBank(params.cuda_devices, pipelines, dmap.gpu_cam_names, ctx)
-    
-    # initialize DBWriter object
-    # if params.write_db:
-    #     dbw = WriteWrapper()
-    # else:
-    #     dbw = []
 
     # get frames and timestamps
     frames, timestamps = loader.get_frames(target_time = None)
