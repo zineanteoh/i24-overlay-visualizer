@@ -123,10 +123,9 @@ def transform_docs_to_boxes(timestamp, id_collection, transformed_collection):
     return classes, box, vehicle_ids
 
 
-def plot_scene(tstate, frames, ts, gpu_cam_names, hg, colors, mask=None, extents=None, fr_num = 0,detections = None,priors = None, id_collection=None, transformed_collection=None, start_ts=None):
+def plot_scene(frames, ts, gpu_cam_names, hg, colors, mask=None, extents=None, fr_num = 0, id_collection=None, transformed_collection=None, start_ts=None):
     """
     Plots the set of active cameras, or a subset thereof
-    tstate - TrackState object
     ts     - stack of camera timestamps
     frames - stack of frames as pytorch tensors
     hg     - Homography Wrapper object
@@ -165,8 +164,6 @@ def plot_scene(tstate, frames, ts, gpu_cam_names, hg, colors, mask=None, extents
         cam_names = keep_cam_names
         ts = [ts[idx] for idx in keep]
         frames = frames[keep, ...]
-
-    class_by_id = tstate.get_classes()
     
     # 2. plot boxes
     # for each frame
