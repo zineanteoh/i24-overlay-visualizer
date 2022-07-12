@@ -258,7 +258,7 @@ def plot_scene(tstate, frames, ts, gpu_cam_names, hg, colors, mask=None, extents
     new_size = (int(cat_im.shape[1]//trunc), int(cat_im.shape[0]//trunc))
     cat_im = cv2.resize(cat_im, new_size) / 255.0
 
-    cv2.imwrite("/home/derek/Desktop/video_viz/batch_5/{}.png".format(str(fr_num).zfill(4)),cat_im*255)
+    cv2.imwrite("/home/derek/Desktop/video_viz/cleaning_code/{}.png".format(str(fr_num).zfill(4)),cat_im*255)
     # plot
     cv2.imshow("frame", cat_im)
     # cv2.setWindowTitle("frame",str(self.frame_num))

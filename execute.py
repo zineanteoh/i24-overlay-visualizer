@@ -26,14 +26,6 @@ from src.detect.devicebank         import DeviceBank
 from src.load.gpu_load_multi       import MCLoader, ManagerClock
 from src.db_write                  import WriteWrapper
 
-#from src.log_init                  import logger
-#from i24_logger.log_writer         import logger,catch_critical,log_warnings
-
-
-
-#from src.load.cpu_load             import DummyNoiseLoader #,MCLoader
-#from src.load.gpu_load             import MCLoader
-
 @log_warnings()
 def parse_cfg_wrapper(run_config):
     params = parse_cfg("TRACK_CONFIG_SECTION",
@@ -97,54 +89,6 @@ def main():
     from i24_logger.log_writer         import logger,catch_critical,log_warnings
     logger.set_name("Tracking Main")
     
-    #%% Old run settings and setup
-    
-    # if False: 
-    #     run_config = "execute.config"       
-    #     #os.environ["user_config_directory"] = "/home/derek/Documents/i24/i24_track/config/lambda_cerulean"
-    #     #os.environ["TRACK_CONFIG_SECTION"] = "DEFAULT"
-    #     in_dir = "/home/derek/Data/dataset_beta/sequence_1"
-        
-        
-    #     # load parameters
-    #     params = parse_cfg("TRACK_CONFIG_SECTION",
-    #                         cfg_name=run_config, SCHEMA=False)
-        
-    #     # verify config notion of GPUs matches torch.cuda notion of available devices
-    #     # get available devices
-        
-    #     # # initialize logger
-    #     # try:
-    #     #     log_params = {
-    #     #                 "log_name":"Tracking Session: {}".format(np.random.randint(0,1000000)),
-    #     #                 "processing_environment":os.environ["TRACK_CONFIG_SECTION"],
-    #     #                 "logstash_address":(params.log_host_ip,params.log_host_port),
-    #     #                 "connect_logstash": (True if "logstash" in params.log_mode else False),
-    #     #                 "connect_syslog":(True if "syslog" in params.log_mode else False),
-    #     #                 "connect_file": (True if "file" in params.log_mode else False),
-    #     #                 "connect_console":(True if "sysout" in params.log_mode else False),
-    #     #                 "console_log_level":params.log_level
-    #     #                 }
-            
-    #     #     logger = connect_automatically(user_settings = log_params)
-    #     #     logger.debug("Logger initialized with custom log settings",extra = log_params)
-    #     # except:
-    #     #     logger.debug("Logger initialized with default parameters")
-        
-        
-        
-    #     # TODO fix this once you redo configparse
-    #     params.cuda_devices = [int(i) for i in range(int(params.cuda_devices))]
-    #     assert max(params.cuda_devices) < torch.cuda.device_count()
-        
-    #     # intialize DeviceMap
-    #     dmap = get_DeviceMap(params.device_map)
-    
-    #     from src.load.gpu_load             import MCLoader
-    #     loader = MCLoader(in_dir, dmap.camera_mapping_file, ctx)
-    
-    
-    
     #%% run settings    
     tm = Timer()
     tm.split("Init")
@@ -157,27 +101,6 @@ def main():
     params = parse_cfg_wrapper(run_config)
     
     in_dir = params.input_directory
-    
-    # # initialize logger
-    # try:
-    #     log_params = {
-    #                 "log_name":"Tracking Session: {}".format(np.random.randint(0,1000000)),
-    #                 "processing_environment":os.environ["TRACK_CONFIG_SECTION"],
-    #                 "logstash_address":(params.log_host_ip,params.log_host_port),
-    #                 "connect_logstash": (True if "logstash" in params.log_mode else False),
-    #                 "connect_syslog":(True if "syslog" in params.log_mode else False),
-    #                 "connect_file": (True if "file" in params.log_mode else False),
-    #                 "connect_console":(True if "sysout" in params.log_mode else False),
-    #                 "console_log_level":params.log_level
-    #                 }
-        
-    #     logger = connect_automatically(user_settings = log_params)
-    #     logger.debug("Logger initialized with custom log settings",extra = log_params)
-    # except:
-    #     logger.debug("Logger initialized with default parameters")
-    
-    # verify config notion of GPUs matches torch.cuda notion of available devices
-    # get available devices
     
     # TODO fix this once you redo configparse
     params.cuda_devices = [int(i) for i in range(int(params.cuda_devices))]
@@ -211,8 +134,6 @@ def main():
         associators = params.associators
         associators = [get_Associator(item) for item in associators]
         
-        # initialize tracker
-        tracker = get_Tracker(params.tracker)
         
         # add Associate function to each pipeline
         # for i in range(len(pipelines)):
@@ -265,9 +186,6 @@ def main():
              hg, colors,extents=dmap.cam_extents_dict, mask=mask,fr_num = frames_processed,detections = None, 
              id_collection=id_collection, transformed_collection=transformed_collection, start_ts=start_ts)
     
-    
-    
-    
     #%% Main Processing Loop
     start_time = time.time()
     
@@ -281,74 +199,6 @@ def main():
     try:
         print("\n\nFrame:    Since Start:  Frame BPS:    Sync Timestamp:     Max ts Deviation:     Active Objects:    Written Objects:")
         while target_time < end_time:
-            
-            if params.track: # shortout actual processing
-                
-                # select pipeline for this frame
-                tm.split("Predict")
-                pidx = frames_processed % len(params.pipeline_pattern)
-                pipeline_idx = params.pipeline_pattern[pidx]
-        
-                camera_idxs, device_idxs, obj_times = dmap(tstate, ts_trunc)
-                obj_ids, priors, selected_obj_idxs = tracker.preprocess(
-                    tstate, obj_times)
-        
-                # slice only objects we care to pass to DeviceBank on this set of frames
-                # DEREK NOTE may run into trouble here since dmap and preprocess implicitly relies on the list ordering of tstate
-                if len(obj_ids) > 0:
-                    obj_ids     =     obj_ids[selected_obj_idxs]
-                    priors      =      priors[selected_obj_idxs,:]
-                    device_idxs = device_idxs[selected_obj_idxs]
-                    camera_idxs = camera_idxs[selected_obj_idxs]
-                
-                # prep input stack by grouping priors by gpu
-                tm.split("Map")
-                cam_idx_names = None  # map idxs to names here
-                prior_stack = dmap.route_objects(
-                    obj_ids, priors, device_idxs, camera_idxs, run_device_ids=params.cuda_devices)
-        
-                # test on a single on-process pipeline
-                # pipelines[pipeline_idx].set_device(0)
-                # pipelines[pipeline_idx].set_cam_names(dmap.gpu_cam_names[0])
-                # test = pipelines[pipeline_idx](frames[0],prior_stack[0])
-        
-        
-                # TODO - full frame detections should probably get full set of objects?
-                # TODO select correct pipeline based on pipeline pattern logic parameter
-                tm.split("Detect {}".format(pipeline_idx),SYNC = True)
-                detections, confs, classes, detection_cam_names, associations = dbank(
-                    prior_stack, frames, pipeline_idx=pipeline_idx)
-                
-                # THIS MAY BE SLOW SINCE ITS DOUBLE INDEXING
-                detection_times = torch.tensor(
-                    [ts_trunc[dmap.cam_idxs[cam_name]] for cam_name in detection_cam_names])
-                
-                
-                
-                tm.split("Associate",SYNC = True)
-                if pipeline_idx == 0:
-                    detections_orig = detections.clone()
-                    if True and len(detections) > 0:
-                        # do nms across all device batches to remove dups
-                        space_new = hg.state_to_space(detections)
-                        keep = space_nms(space_new,confs)
-                        detections = detections[keep,:]
-                        classes = classes[keep]
-                        confs = confs[keep]
-                        detection_times = detection_times[keep]
-                    
-                    # overwrite associations here
-                    associations = associators[0](obj_ids,priors,detections,hg)
-        
-                tm.split("Postprocess")
-                terminated_objects = tracker.postprocess(
-                    detections, detection_times, classes, confs, associations, tstate, hg = hg,measurement_idx =0)
-                term_objects += len(terminated_objects)
-    
-                if params.write_db:
-                    dbw.insert(terminated_objects,time_offset = start_ts)
-                #print("Active Trajectories: {}  Terminated Trajectories: {}   Documents in database: {}".format(len(tstate),len(terminated_objects),len(dbw)))
-    
             frames_processed += 1
     
             # optionally, plot outputs
@@ -359,7 +209,6 @@ def main():
                 plot_scene(tstate, frames, ts_trunc, dmap.gpu_cam_names,
                      hg, colors,extents=dmap.cam_extents_dict, mask=mask,fr_num = frames_processed,detections = detections,priors = priors, 
                      id_collection=id_collection, transformed_collection=transformed_collection, start_ts=start_ts)
-    
             
             # text readout update
             tm.split("Bookkeeping")
@@ -386,15 +235,13 @@ def main():
                     "total terminated objects":term_objects,
                     "avg skipped frames per processed frame": nom_framerate*(target_time - start_ts)/frames_processed -1
                     }
-                logger.info("Tracking Status Log",extra = metrics)
-                logger.info("Time Utilization: {}".format(tm),extra = tm.bins())
                 
             if frames_processed % 100 == 0:
                 checkpoint(target_time,tstate)
        
         
         checkpoint(tstate, target_time)
-        logger.info("Finished tracking over input time range. Shutting down.")
+        logger.info("Finished over input time range. Shutting down.")
         
     except KeyboardInterrupt:
         logger.debug("Keyboard Interrupt recieved. Initializing soft shutdown")
