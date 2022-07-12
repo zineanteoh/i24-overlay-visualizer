@@ -163,19 +163,7 @@ def plot_scene(frames, ts, gpu_cam_names, hg, colors, mask=None, extents=None, f
         # get the reported position of each object from mongodb for timestamp 
         classes, boxes, vehicle_ids = transform_docs_to_boxes(timestamp, id_collection, transformed_collection)
         ids = torch.tensor([x for x in range(len(boxes))])
-        
-        # if extents is not None and len(boxes) > 0:
-        #     xmin, xmax, _ = extents[cam_names[f_idx]]
 
-        #     # select objects that fall within that camera's space range (+ some tolerance)
-        #     keep_obj = torch.mul(torch.where(boxes[:, 0] > xmin - PLOT_TOLERANCE, 1, 0), torch.where(
-        #         boxes[:, 0] < xmax + PLOT_TOLERANCE, 1, 0)).nonzero().squeeze(1)
-        #     boxes = boxes[keep_obj,:]
-        #     ids = ids[keep_obj]
-        #     classes = classes[keep_obj]
-        #     classes = [hg.hg1.class_dict[cls.item()] for cls in classes]
-                            
-        
         # convert frame into cv2 image
         fr = (denorm(frames[f_idx]).numpy().transpose(1, 2, 0)*255)[:,:,::-1]
         #fr = frames[f_idx].numpy().transpose(1,2,0)
@@ -191,32 +179,6 @@ def plot_scene(frames, ts, gpu_cam_names, hg, colors, mask=None, extents=None, f
             
             fr = hg.plot_state_boxes(
                 fr.copy(), boxes, name=cam_names[f_idx], labels=labels,thickness = 3, color = color_slice)
-
-        # plot original detections
-        # if detections is not None:
-        #     keep_det= torch.mul(torch.where(detections[:, 0] > xmin - PLOT_TOLERANCE, 1, 0), torch.where(
-        #         detections[:, 0] < xmax + PLOT_TOLERANCE, 1, 0)).nonzero().squeeze(1)
-        #     detections_selected = detections[keep_det,:]        # ids, boxes = tstate(ts[f_idx],with_direction=True)
-        # classes = torch.tensor([class_by_id[id.item()] for id in ids])
-        # print(boxes.shape)
-        # print(classes.shape)
-        # print(ids.shape)
-        # print(boxes)
-        # print(classes)
-        # print(ids)
-            
-        #     fr = hg.plot_state_boxes(
-        #         fr.copy(), detections_selected, name=cam_names[f_idx], labels=None,thickness = 1, color = (255,0,0))
-
-        # plot priors
-        # if priors is not None and len(priors) > 0:
-        #     keep_pr = torch.mul(torch.where(priors[:, 0] > xmin - PLOT_TOLERANCE, 1, 0), torch.where(
-        #         priors[:, 0] < xmax + PLOT_TOLERANCE, 1, 0)).nonzero().squeeze(1)
-        #     priors_selected = priors[keep_pr,:]
-            
-        #     fr = hg.plot_state_boxes(
-        #         fr.copy(), priors_selected, name=cam_names[f_idx], labels=None,thickness = 1, color = (0,0,255))
-
 
         # plot timestamp
         fr = cv2.putText(fr.copy(), "Timestamp: {:.3f}s".format(ts[f_idx]), (10,70), cv2.FONT_HERSHEY_PLAIN,2,(0,0,0),3)
@@ -243,6 +205,7 @@ def plot_scene(frames, ts, gpu_cam_names, hg, colors, mask=None, extents=None, f
     new_size = (int(cat_im.shape[1]//trunc), int(cat_im.shape[0]//trunc))
     cat_im = cv2.resize(cat_im, new_size) / 255.0
 
+    # write to file
     cv2.imwrite("/home/derek/Desktop/video_viz/cleaning_code/{}.png".format(str(fr_num).zfill(4)),cat_im*255)
     # plot
     cv2.imshow("frame", cat_im)

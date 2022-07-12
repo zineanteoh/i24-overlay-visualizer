@@ -1,11 +1,5 @@
-import torch.multiprocessing as mp
-import socket
-import _pickle as pickle
 
 from i24_logger.log_writer         import logger, catch_critical, log_warnings
-
-
-ctx = mp.get_context('spawn')
 
 import numpy as np
 import torch
@@ -19,6 +13,9 @@ from src.scene.devicemap           import get_DeviceMap
 from src.scene.homography          import HomographyWrapper, Homography
 from src.load.gpu_load_multi       import MCLoader, ManagerClock
 
+import torch.multiprocessing as mp
+ctx = mp.get_context('spawn')
+
 @log_warnings()
 def parse_cfg_wrapper(run_config):
     params = parse_cfg("TRACK_CONFIG_SECTION",
@@ -27,17 +24,15 @@ def parse_cfg_wrapper(run_config):
 
 @catch_critical()
 def soft_shutdown(target_time,cleanup = []):
-    logger.warning("Soft Shutdown initiated. Either SIGINT or KeyboardInterrupt recieved")
-    
     for i in range(len(cleanup)-1,-1,-1):
         del cleanup[i]
     
     logger.debug("Soft Shutdown complete. All processes should be terminated")
     raise KeyboardInterrupt()
 
-def main():   
+def main(): 
     from i24_logger.log_writer         import logger,catch_critical,log_warnings
-    logger.set_name("Tracking Main")
+    logger.set_name("Overlay Bounding Box Visualizer")
     
     # start pymongo instance for plotting
     client = pymongo.MongoClient(host="10.2.218.56",
@@ -130,8 +125,8 @@ def main():
             fps = frames_processed/(time.time() - start_time)
             dev = [np.abs(t-target_time) for t in timestamps]
             max_dev = max(dev)
-            print("\r{}        {:.3f}s       {:.2f}        {:.3f}              {:.3f}".format(frames_processed, time.time() - start_time,fps,target_time, max_dev), end='\r', flush=True)
-        
+            print("{}        {:.3f}s       {:.2f}        {:.3f}              {:.3f}".format(frames_processed, time.time() - start_time,fps,target_time, max_dev))
+            
             # get next target time
             target_time = clock.tick(timestamps)
             
@@ -139,7 +134,7 @@ def main():
             tm.split("Get Frames")
             frames, timestamps = loader.get_frames(target_time)
             ts_trunc = [item - start_ts for item in timestamps]
-    
+            
             if frames_processed % 20 == 1:
                 metrics = {
                     "frame bps": fps,
