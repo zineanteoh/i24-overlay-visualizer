@@ -21,7 +21,6 @@ def soft_shutdown(target_time,cleanup = []):
     raise KeyboardInterrupt()
 
 def main(): 
-    logger.set_name("Overlay Bounding Box Visualizer")
     
     # start pymongo instance for plotting
     client = pymongo.MongoClient(host="10.2.218.56",
@@ -30,17 +29,23 @@ def main():
                                  password="mongodb@i24",
                                  connect=True,
                                  connectTimeoutMS=5000)
+    # select collections to query from
     db = client["zitest"]
     id_collection = db["batch_5_07072022"]
     transformed_collection = db["batch_5_07072022_transformed"]
     
-    #%% run settings 
+    # set which cameras to plot
+    # ... to plot all cameras: mask = None 
+    # ... to plot a list of cameras: mask = ["p46c01", "p46c02", "p46c03", "p46c04", "p46c05", "p46c06"]
+    mask = None
+    
+    #%% run settings
+    logger.set_name("Overlay Bounding Box Visualizer")
+    
     tm = Timer()
     tm.split("Init")
     
     run_config = "execute.config" 
-    # mask = ["p46c01", "p46c02", "p46c03", "p46c04", "p46c05", "p46c06"]
-    mask = None
     
     # load parameters from config
     params = parse_cfg("DEFAULT", cfg_name=run_config, SCHEMA=False)
@@ -58,8 +63,6 @@ def main():
     loader = MCLoader(in_dir, dmap.camera_mapping_file,dmap.cam_names, ctx,start_time = None)
     
     logger.debug("Initialized {} loader processes.".format(len(loader.device_loaders)))
-    
-    #%% more init stuff 
     
     # initialize Homography object
     hg = HomographyWrapper(hg1 = params.eb_homography_file,hg2 = params.wb_homography_file)
@@ -81,6 +84,7 @@ def main():
     frames_processed = 0
     term_objects = 0
     
+    #%% 
     # plot first frame
     if params.plot:
         plot_scene(frames, ts_trunc, dmap.gpu_cam_names,
@@ -98,7 +102,7 @@ def main():
     
     # readout headers
     try:
-        print("\n\nFrame:    Since Start:  Frame BPS:    Sync Timestamp:     Max ts Deviation:     Active Objects:    Written Objects:")
+        print("\n\nFrame:     Since Start:     Frame BPS:     Sync Timestamp:     Max ts Deviation:")
         while target_time < end_time:
             frames_processed += 1
             
@@ -114,7 +118,7 @@ def main():
             fps = frames_processed/(time.time() - start_time)
             dev = [np.abs(t-target_time) for t in timestamps]
             max_dev = max(dev)
-            print("{}        {:.3f}s       {:.2f}        {:.3f}              {:.3f}".format(frames_processed, time.time() - start_time,fps,target_time, max_dev))
+            print("{}     {:.3f}s     {:.2f}     {:.3f}     {:.3f}".format(frames_processed, time.time() - start_time,fps,target_time, max_dev))
             
             # get next target time
             target_time = clock.tick(timestamps)
@@ -141,6 +145,5 @@ def main():
         logger.debug("Keyboard Interrupt recieved. Initializing soft shutdown")
         soft_shutdown(target_time, cleanup = [loader])
 
-     
 if __name__ == "__main__":
     main()

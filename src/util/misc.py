@@ -54,7 +54,7 @@ def transform_docs_to_boxes(timestamp, id_collection, transformed_collection):
     lower_timestamp_doc = transformed_collection.find_one({"timestamp": lower})
     upper_timestamp_doc = transformed_collection.find_one({"timestamp": upper})
     
-    print("Camera timestamp: {}. Interpolating between {} to {}".format(timestamp, lower, upper))
+    # print("Camera timestamp: {}. Interpolating between {} to {}".format(timestamp, lower, upper))
     
     # query for all trajectory documents whose index is in the union of the two timestamp docs
     # ... apply projectiong to only return necessary fields
