@@ -1,26 +1,16 @@
-
-from i24_logger.log_writer         import logger, catch_critical, log_warnings
-
+import torch.multiprocessing as mp
 import numpy as np
 import torch
-import os
 import time
 import pymongo
-
-from src.util.misc                 import plot_scene,colors,Timer
-from i24_configparse               import parse_cfg
-from src.scene.devicemap           import get_DeviceMap
+from i24_logger.log_writer         import logger, catch_critical, log_warnings
 from src.scene.homography          import HomographyWrapper, Homography
 from src.load.gpu_load_multi       import MCLoader, ManagerClock
+from src.util.misc                 import plot_scene,colors,Timer
+from src.scene.devicemap           import get_DeviceMap
+from i24_configparse               import parse_cfg
 
-import torch.multiprocessing as mp
 ctx = mp.get_context('spawn')
-
-@log_warnings()
-def parse_cfg_wrapper(run_config):
-    params = parse_cfg("TRACK_CONFIG_SECTION",
-                       cfg_name=run_config, SCHEMA=False)
-    return params
 
 @catch_critical()
 def soft_shutdown(target_time,cleanup = []):
@@ -31,7 +21,6 @@ def soft_shutdown(target_time,cleanup = []):
     raise KeyboardInterrupt()
 
 def main(): 
-    from i24_logger.log_writer         import logger,catch_critical,log_warnings
     logger.set_name("Overlay Bounding Box Visualizer")
     
     # start pymongo instance for plotting
@@ -45,16 +34,16 @@ def main():
     id_collection = db["batch_5_07072022"]
     transformed_collection = db["batch_5_07072022_transformed"]
     
-    #%% run settings    
+    #%% run settings 
     tm = Timer()
     tm.split("Init")
     
-    run_config = "execute.config"       
+    run_config = "execute.config" 
     # mask = ["p46c01", "p46c02", "p46c03", "p46c04", "p46c05", "p46c06"]
     mask = None
     
     # load parameters from config
-    params = parse_cfg_wrapper(run_config)
+    params = parse_cfg("DEFAULT", cfg_name=run_config, SCHEMA=False)
     
     # load input directory of video files from params
     in_dir = params.input_directory
