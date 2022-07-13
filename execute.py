@@ -29,6 +29,7 @@ def main():
                                  password="mongodb@i24",
                                  connect=True,
                                  connectTimeoutMS=5000)
+    
     # select collections to query from
     db = client["zitest"]
     id_collection = db["batch_5_07072022"]
@@ -45,12 +46,9 @@ def main():
     tm = Timer()
     tm.split("Init")
     
-    run_config = "execute.config" 
-    
-    # load parameters from config
+    # load parameters from config and load in_dir, the directory of the video files
+    run_config = "execute.config"
     params = parse_cfg("DEFAULT", cfg_name=run_config, SCHEMA=False)
-    
-    # load input directory of video files from params
     in_dir = params.input_directory
     
     # TODO fix this once you redo configparse
@@ -59,9 +57,7 @@ def main():
     
     # intialize DeviceMap
     dmap = get_DeviceMap(params.device_map)
-    
     loader = MCLoader(in_dir, dmap.camera_mapping_file,dmap.cam_names, ctx,start_time = None)
-    
     logger.debug("Initialized {} loader processes.".format(len(loader.device_loaders)))
     
     # initialize Homography object
@@ -82,7 +78,6 @@ def main():
     ts_trunc = [item - start_ts for item in timestamps]
     
     frames_processed = 0
-    term_objects = 0
     
     #%% 
     # plot first frame
@@ -134,10 +129,9 @@ def main():
                     "frame batches processed":frames_processed,
                     "run time":time.time() - start_time,
                     "scene time processed":target_time - start_ts,
-                    # "active objects":len(tstate),
-                    "total terminated objects":term_objects,
                     "avg skipped frames per processed frame": nom_framerate*(target_time - start_ts)/frames_processed -1
                     }
+                print(metrics)
         
         logger.info("Finished over input time range. Shutting down.")
         
