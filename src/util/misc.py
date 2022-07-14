@@ -43,9 +43,105 @@ class Timer:
         out = ["{}:{:2f}s/call".format(key,self.sections[key]/self.section_calls[key]) for key in self.sections.keys()]
         return str(out)
 
-def transform_docs_to_boxes(timestamp, id_collection, transformed_collection):
+def transform_raw_docs(timestamp, id_collection, transformed_collection):
+    """
+    This function transforms raw documents into tensor classes, boxes, and vehicle IDs for plotting
+    This function should only be called when MODE == "RAW"
     """
     
+    # query an upper timestamp and lower timestamp
+    lower = (np.floor(timestamp * 25) / 25).item()
+    upper = (np.ceil(timestamp * 25) / 25).item()
+    lower_timestamp_doc = transformed_collection.find_one({"timestamp": lower})
+    upper_timestamp_doc = transformed_collection.find_one({"timestamp": upper})
+    
+    # timestamp:
+    # {
+    #     timestamp: 0.0
+    #     configuration_id: XXX
+    #     id: [a, b, c, ...]
+    #     position: [(x,y), (x,y), ...],
+    #     dimensions: [(l,w,h), (l,w,h), ...]
+    # }
+    
+    # print("Camera timestamp: {}. Interpolating between {} to {}".format(timestamp, lower, upper))
+    
+    # query for all trajectory documents whose index is in the union of the two timestamp docs
+    # ... apply projectiong to only return coarse_vehicle_class
+    lower_id_set = set(lower_timestamp_doc["id"])
+    upper_id_set = set(upper_timestamp_doc["id"])
+    traj_cursor = id_collection.find({"_id": {"$in": list(lower_id_set | upper_id_set)}}, 
+                                    {"direction": 1, "coarse_vehicle_class":1})
+    traj_cache = {}
+    for traj in traj_cursor:
+        traj_cache[traj["_id"]] = (traj["direction"], traj["coarse_vehicle_class"])
+    
+    box = []
+    classes = []
+    vehicle_ids = []
+    
+    for vehicle_id in list(lower_id_set | upper_id_set):
+        vehicle_in_lower = vehicle_id in lower_id_set
+        vehicle_in_upper = vehicle_id in upper_id_set
+        
+        if vehicle_in_lower and vehicle_in_upper:
+            # interpolate x,y positions
+            lower_index = lower_timestamp_doc["id"].index(vehicle_id)
+            upper_index = upper_timestamp_doc["id"].index(vehicle_id)
+            lower_x = lower_timestamp_doc["position"][lower_index][0]
+            upper_x = upper_timestamp_doc["position"][upper_index][0]
+            lower_y = lower_timestamp_doc["position"][lower_index][1]
+            upper_y = upper_timestamp_doc["position"][upper_index][1]
+            x_position = np.interp(timestamp, [lower, upper], [lower_x, upper_x]).item()
+            y_position = np.interp(timestamp, [lower, upper], [lower_y, upper_y]).item()
+        elif vehicle_in_lower:
+            # plot x,y from lower timestamp
+            lower_index = lower_timestamp_doc["id"].index(vehicle_id)
+            x_position = lower_timestamp_doc["position"][lower_index][0]
+            y_position = lower_timestamp_doc["position"][lower_index][1]
+        else:
+            # plot x,y from upper timestamp
+            upper_index = upper_timestamp_doc["id"].index(vehicle_id)
+            x_position = upper_timestamp_doc["position"][upper_index][0]
+            y_position = upper_timestamp_doc["position"][upper_index][1]
+            
+        # get the dimensions
+        if vehicle_in_lower and not vehicle_in_upper:
+            # dimension only exists in lower
+            length = lower_timestamp_doc["dimensions"][lower_index][0]
+            width = lower_timestamp_doc["dimensions"][lower_index][1]
+            height = lower_timestamp_doc["dimensions"][lower_index][2]
+        elif not vehicle_in_lower and vehicle_in_upper:
+            # dimension only exists in lower
+            length = upper_timestamp_doc["dimensions"][upper_index][0]
+            width = upper_timestamp_doc["dimensions"][upper_index][1]
+            height = upper_timestamp_doc["dimensions"][upper_index][2]
+        else:
+            # dimension exists in both lower and upper
+            # ... get from the closest timestamp
+            if timestamp - lower < upper - timestamp:
+                length = lower_timestamp_doc["dimensions"][lower_index][0]
+                width = lower_timestamp_doc["dimensions"][lower_index][1]
+                height = lower_timestamp_doc["dimensions"][lower_index][2]
+            else:
+                length = upper_timestamp_doc["dimensions"][upper_index][0]
+                width = upper_timestamp_doc["dimensions"][upper_index][1]
+                height = upper_timestamp_doc["dimensions"][upper_index][2]
+            
+        
+        direction = traj_cache[vehicle_id][0]
+        classes.append(traj_cache[vehicle_id][1])
+        
+        box.append([x_position, y_position, length, width, height, direction, 0])
+        vehicle_ids.append(vehicle_id)
+    box = torch.tensor(box)
+    classes = torch.tensor(classes)
+    return classes, box, vehicle_ids
+
+def transform_reconciled_docs(timestamp, id_collection, transformed_collection):
+    """
+    This function transforms reconciled documents into tensor classes, boxes, and vehicle IDs for plotting
+    This function should only be called when MODE == "RECONCILED"
     """
     
     # query an upper timestamp and lower timestamp
@@ -67,13 +163,6 @@ def transform_docs_to_boxes(timestamp, id_collection, transformed_collection):
     classes = []
     vehicle_ids = []
     for index, traj in enumerate(traj_cursor):
-        # traj:
-        # {
-        #     timestamp: 0.0
-        #     id: [a, b, c, ...]
-        #     x_position: [1, 2, 3, ...],
-        #     y_position: [1, 2, 3, ...]
-        # }
         vehicle_id = traj["_id"]
         vehicle_ids.append(vehicle_id)
         
@@ -81,28 +170,28 @@ def transform_docs_to_boxes(timestamp, id_collection, transformed_collection):
             # interpolate x and y position
             lower_index = lower_timestamp_doc["id"].index(vehicle_id)
             upper_index = upper_timestamp_doc["id"].index(vehicle_id)
-            lower_x = lower_timestamp_doc["x_position"][lower_index]
-            upper_x = upper_timestamp_doc["x_position"][upper_index]
-            lower_y = lower_timestamp_doc["y_position"][lower_index]
-            upper_y = upper_timestamp_doc["y_position"][upper_index]
+            lower_x = lower_timestamp_doc["position"][lower_index][0]
+            upper_x = upper_timestamp_doc["position"][upper_index][0]
+            lower_y = lower_timestamp_doc["position"][lower_index][1]
+            upper_y = upper_timestamp_doc["position"][upper_index][1]
             x_position = np.interp(timestamp, [lower, upper], [lower_x, upper_x]).item()
             y_position = np.interp(timestamp, [lower, upper], [lower_y, upper_y]).item()
         elif vehicle_id in lower_id_set.difference(upper_id_set):
             # plot x,y from lower timestamp
             lower_index = lower_timestamp_doc["id"].index(vehicle_id)
-            x_position = lower_timestamp_doc["x_position"][lower_index]
-            y_position = lower_timestamp_doc["y_position"][lower_index]
+            x_position = lower_timestamp_doc["position"][lower_index][0]
+            y_position = lower_timestamp_doc["position"][lower_index][1]
         else:
             # plot x,y from upper timestamp
             upper_index = upper_timestamp_doc["id"].index(vehicle_id)
-            x_position = upper_timestamp_doc["x_position"][upper_index]
-            y_position = upper_timestamp_doc["y_position"][upper_index]
+            x_position = upper_timestamp_doc["position"][upper_index][0]
+            y_position = upper_timestamp_doc["position"][upper_index][1]
         
         direction = traj["direction"]
         
-        length = np.median(traj["length"]).item()
-        width = np.median(traj["width"]).item()
-        height = np.median(traj["height"]).item()
+        length = traj["length"]
+        width = traj["width"]
+        height = traj["height"]
         
         classes.append(traj["coarse_vehicle_class"])
         box.append([x_position, y_position, length, width, height, direction, 0])
@@ -161,7 +250,10 @@ def plot_scene(MODE, frames, ts, gpu_cam_names, hg, colors, mask=None, extents=N
         timestamp = ts[f_idx] + start_ts
         
         # get the reported position of each object from mongodb for timestamp 
-        classes, boxes, vehicle_ids = transform_docs_to_boxes(timestamp, id_collection, transformed_collection)
+        if MODE == "RAW":
+            classes, boxes, vehicle_ids = transform_raw_docs(timestamp, id_collection, transformed_collection)
+        elif MODE == "RECONCILED":
+            classes, boxes, vehicle_ids = transform_reconciled_docs(timestamp, id_collection, transformed_collection)
         ids = torch.tensor([x for x in range(len(boxes))])
 
         # convert frame into cv2 image
@@ -206,7 +298,7 @@ def plot_scene(MODE, frames, ts, gpu_cam_names, hg, colors, mask=None, extents=N
     cat_im = cv2.resize(cat_im, new_size) / 255.0
 
     # write to file
-    cv2.imwrite("/home/derek/Desktop/video_viz/cleaning_code/{}.png".format(str(fr_num).zfill(4)),cat_im*255)
+    cv2.imwrite("/home/derek/Documents/i24/i24_video_viz/temp_frames/{}.png".format(str(fr_num).zfill(4)),cat_im*255)
     # plot
     cv2.imshow("frame", cat_im)
     # cv2.setWindowTitle("frame",str(self.frame_num))

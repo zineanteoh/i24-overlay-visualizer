@@ -37,7 +37,7 @@ def main():
     
     # determine if collection is RAW or RECONCILED
     first_doc = transformed_collection.find_one()
-    if 'dimension' in first_doc:
+    if 'dimensions' in first_doc:
         MODE = "RAW"
     else:
         MODE = "RECONCILED"
