@@ -35,6 +35,13 @@ def main():
     id_collection = db["batch_5_07072022"]
     transformed_collection = db["batch_5_07072022_transformed"]
     
+    # determine if collection is RAW or RECONCILED
+    first_doc = transformed_collection.find_one()
+    if 'dimension' in first_doc:
+        MODE = "RAW"
+    else:
+        MODE = "RECONCILED"
+    
     # set which cameras to plot
     # ... to plot all cameras: mask = None 
     # ... to plot a list of cameras: mask = ["p46c01", "p46c02", "p46c03", "p46c04", "p46c05", "p46c06"]
@@ -82,7 +89,7 @@ def main():
     #%% 
     # plot first frame
     if params.plot:
-        plot_scene(frames, ts_trunc, dmap.gpu_cam_names,
+        plot_scene(MODE, frames, ts_trunc, dmap.gpu_cam_names,
              hg, colors,extents=dmap.cam_extents_dict, mask=mask,fr_num = frames_processed, 
              id_collection=id_collection, transformed_collection=transformed_collection, start_ts=start_ts)
     
@@ -104,7 +111,7 @@ def main():
             # plot overlay bounding boxes
             if params.plot:
                 tm.split("Plot")
-                plot_scene(frames, ts_trunc, dmap.gpu_cam_names,
+                plot_scene(MODE, frames, ts_trunc, dmap.gpu_cam_names,
                      hg, colors,extents=dmap.cam_extents_dict, mask=mask,fr_num = frames_processed, 
                      id_collection=id_collection, transformed_collection=transformed_collection, start_ts=start_ts)
             

@@ -111,9 +111,10 @@ def transform_docs_to_boxes(timestamp, id_collection, transformed_collection):
     return classes, box, vehicle_ids
 
 
-def plot_scene(frames, ts, gpu_cam_names, hg, colors, mask=None, extents=None, fr_num = 0, id_collection=None, transformed_collection=None, start_ts=None):
+def plot_scene(MODE, frames, ts, gpu_cam_names, hg, colors, mask=None, extents=None, fr_num = 0, id_collection=None, transformed_collection=None, start_ts=None):
     """
     Plots the set of active cameras, or a subset thereof
+    MODE   - if collection to visualize is "RAW" or "RECONCILED"
     ts     - stack of camera timestamps
     frames - stack of frames as pytorch tensors
     hg     - Homography Wrapper object
@@ -128,7 +129,6 @@ def plot_scene(frames, ts, gpu_cam_names, hg, colors, mask=None, extents=None, f
     MONITOR_SIZE = (2160, 3840)
     denorm = transforms.Normalize(mean=[-0.485/0.229, -0.456/0.224, -0.406/0.225],
                                   std=[1/0.229, 1/0.224, 1/0.225])
-    #mask = ["p1c1"]
 
     # 1. prep frames
     # move to CPU
